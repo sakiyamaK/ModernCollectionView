@@ -10,7 +10,7 @@
 import UIKit
 import Collections
 
-public class ModernCollectionView2<SectionID, ItemID, CellID>: UICollectionView where
+public class ModernCollectionView<SectionID, ItemID, CellID>: UICollectionView where
     SectionID: Hashable, SectionID: Sendable,
     ItemID: Hashable, ItemID: Sendable,
     CellID: Hashable, CellID: Sendable {
