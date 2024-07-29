@@ -11,9 +11,9 @@ import UIKit
 import Collections
 
 public class ModernCollectionView<SectionID, ItemID, CellID>: UICollectionView where
-    SectionID: Hashable, SectionID: Sendable,
-    ItemID: Hashable, ItemID: Sendable,
-    CellID: Hashable, CellID: Sendable {
+SectionID: Hashable, SectionID: Sendable,
+ItemID: Hashable, ItemID: Sendable,
+CellID: Hashable, CellID: Sendable {
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
@@ -21,27 +21,11 @@ public class ModernCollectionView<SectionID, ItemID, CellID>: UICollectionView w
     
     private(set) var diffableDatasource: UICollectionViewDiffableDataSource<SectionID, ItemID>!
     private(set) var cellRegistrations: OrderedDictionary<CellID, UICollectionView.CellRegistration<UICollectionViewCell, ItemID>> = [:]
-    
-    @discardableResult
-    func set(cellRegistrationHandlers: OrderedDictionary<CellID, UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler>) -> Self {
-        for (key, cellRegistrationHandler) in cellRegistrationHandlers {
-            self.cellRegistrations[key] = UICollectionView.CellRegistration(handler: cellRegistrationHandler)
-        }
-        return self
-    }
-    
-    @discardableResult
-    func set(cellRegistrationHandlers: [UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler]) -> Self where CellID == Int {
-        for (idx, cellRegistrationHandler) in cellRegistrationHandlers.enumerated() {
-            self.cellRegistrations[idx] = UICollectionView.CellRegistration(handler: cellRegistrationHandler)
-        }
-        return self
-    }
-    
+        
     public init(collectionViewLayoutBuilder: (() -> UICollectionViewLayout)) {
         
         super.init(frame: .zero, collectionViewLayout: collectionViewLayoutBuilder())
-                
+        
         self.diffableDatasource = UICollectionViewDiffableDataSource<SectionID, ItemID>(collectionView: self, cellProvider: { collectionView, indexPath, itemIdentifier in
             collectionView.dequeueConfiguredReusableCell(
                 using: self.cellRegistrations.elements[indexPath.section].value,
@@ -69,7 +53,7 @@ public class ModernCollectionView<SectionID, ItemID, CellID>: UICollectionView w
     }
     
     public init(collectionViewLayoutBuilder: (() -> UICollectionViewLayout), cellRegistrationHandlers: [UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler]) where CellID == Int {
-
+        
         super.init(frame: .zero, collectionViewLayout: collectionViewLayoutBuilder())
         
         for (idx, cellRegistrationHandler) in cellRegistrationHandlers.enumerated() {
@@ -88,15 +72,31 @@ public class ModernCollectionView<SectionID, ItemID, CellID>: UICollectionView w
     public convenience init(
         collectionViewLayoutBuilder: (() -> UICollectionViewLayout),
         _ cellRegistrationHandler: @escaping UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler) where CellID == Int {
-        self.init(collectionViewLayoutBuilder: collectionViewLayoutBuilder, cellRegistrationHandlers: [cellRegistrationHandler])
-    }
+            self.init(collectionViewLayoutBuilder: collectionViewLayoutBuilder, cellRegistrationHandlers: [cellRegistrationHandler])
+        }
     
     public convenience init(
         collectionViewLayoutBuilder: (() -> UICollectionViewLayout),
         cellRegistrationHandler: @escaping UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler) where CellID == Int {
-        self.init(collectionViewLayoutBuilder: collectionViewLayoutBuilder, cellRegistrationHandlers: [cellRegistrationHandler])
+            self.init(collectionViewLayoutBuilder: collectionViewLayoutBuilder, cellRegistrationHandlers: [cellRegistrationHandler])
+        }
+    
+    @discardableResult
+    public func set(cellRegistrationHandlers: OrderedDictionary<CellID, UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler>) -> Self {
+        for (key, cellRegistrationHandler) in cellRegistrationHandlers {
+            self.cellRegistrations[key] = UICollectionView.CellRegistration(handler: cellRegistrationHandler)
+        }
+        return self
     }
-                
+    
+    @discardableResult
+    public func set(cellRegistrationHandlers: [UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler]) -> Self where CellID == Int {
+        for (idx, cellRegistrationHandler) in cellRegistrationHandlers.enumerated() {
+            self.cellRegistrations[idx] = UICollectionView.CellRegistration(handler: cellRegistrationHandler)
+        }
+        return self
+    }
+    
     @discardableResult
     public func apply(datasource: [SectionID: [ItemID]], animatingDifferences: Bool) -> Self {
         var snapshot = NSDiffableDataSourceSnapshot<SectionID, ItemID>()
