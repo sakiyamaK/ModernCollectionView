@@ -142,7 +142,6 @@ public extension ModernCollectionView {
             guard let self else { fatalError() }
             switch kind {
             case UICollectionView.elementKindSectionHeader:
-                DLog(self.headerViews)
                 guard let headerView = self.headerViews[indexPath.section] else { fatalError() }
                 return collectionView.dequeueConfiguredReusableSupplementary(using: headerView, for: indexPath)
             case UICollectionView.elementKindSectionFooter:
