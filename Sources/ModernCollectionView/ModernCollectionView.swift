@@ -1,5 +1,5 @@
 //
-//  MordernCollectionViewController.swift
+//  MordernCollectionView.swift
 //
 //
 //  Created by sakiyamaK on 2024/06/15.
@@ -19,70 +19,72 @@ CellID: Hashable, CellID: Sendable {
         fatalError("init(coder:) has not been implemented")
     }
     
-    private(set) var diffableDatasource: UICollectionViewDiffableDataSource<SectionID, ItemID>!
-    private(set) var cellRegistrations: OrderedDictionary<CellID, UICollectionView.CellRegistration<UICollectionViewCell, ItemID>> = [:]
+    public private(set) var diffableDataSource: UICollectionViewDiffableDataSource<SectionID, ItemID>!
+    public private(set) var cellRegistrations: OrderedDictionary<CellID, UICollectionView.CellRegistration<UICollectionViewCell, ItemID>> = [:]
+    public private(set) var headerViews: [Int: UICollectionView.SupplementaryRegistration<UICollectionViewCell>] = [:]
+    public private(set) var footerViews: [Int: UICollectionView.SupplementaryRegistration<UICollectionViewCell>] = [:]
+
+    public init(
+        collectionViewLayoutHandler: (() -> UICollectionViewLayout),
+        cellRegistrationHandlers: OrderedDictionary<CellID, UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler> = [:],
+        headerViewHandlers: [Int: () -> UIContentConfiguration] = [:],
+        footerViewHandlers: [Int: () -> UIContentConfiguration] = [:]
+    ) {
         
-    public init(collectionViewLayoutBuilder: (() -> UICollectionViewLayout)) {
+        super.init(frame: .zero, collectionViewLayout: collectionViewLayoutHandler())
         
-        super.init(frame: .zero, collectionViewLayout: collectionViewLayoutBuilder())
+        set(cellRegistrationHandlers: cellRegistrationHandlers)
         
-        self.diffableDatasource = UICollectionViewDiffableDataSource<SectionID, ItemID>(collectionView: self, cellProvider: { collectionView, indexPath, itemIdentifier in
+        self.diffableDataSource = UICollectionViewDiffableDataSource<SectionID, ItemID>(collectionView: self, cellProvider: { collectionView, indexPath, itemIdentifier in
             collectionView.dequeueConfiguredReusableCell(
                 using: self.cellRegistrations.elements[indexPath.section].value,
                 for: indexPath,
                 item: itemIdentifier
             )
         })
+        
+        self.headerViews = Dictionary(uniqueKeysWithValues: headerViewHandlers.compactMap({ sectionIndex, _ in
+            let value = UICollectionView.SupplementaryRegistration<UICollectionViewCell>(elementKind: UICollectionView.elementKindSectionHeader) {[weak self] (supplementaryView, elementKind, indexPath) in
+                guard let self, let headerViewHandler = headerViewHandlers[indexPath.section] else { fatalError() }
+                supplementaryView.contentConfiguration = headerViewHandler()
+            }
+            return (sectionIndex, value)
+        }))
+        
+        self.footerViews = Dictionary(uniqueKeysWithValues: footerViewHandlers.compactMap({ sectionIndex, _ in
+            let value = UICollectionView.SupplementaryRegistration<UICollectionViewCell>(elementKind: UICollectionView.elementKindSectionFooter) {[weak self] (supplementaryView, elementKind, indexPath) in
+                guard let self, let footerViewHandler = footerViewHandlers[indexPath.section] else { fatalError() }
+                supplementaryView.contentConfiguration = footerViewHandler()
+            }
+            return (sectionIndex, value)
+        }))
     }
     
-    public init(collectionViewLayoutBuilder: (() -> UICollectionViewLayout), cellRegistrationHandlers: OrderedDictionary<CellID, UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler>) {
+    public convenience init(collectionViewLayoutHandler: (() -> UICollectionViewLayout), cellRegistrationHandlers: [UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler]) where CellID == Int {
         
-        super.init(frame: .zero, collectionViewLayout: collectionViewLayoutBuilder())
-        
-        for (key, cellRegistrationHandler) in cellRegistrationHandlers {
-            self.cellRegistrations[key] = UICollectionView.CellRegistration(handler: cellRegistrationHandler)
-        }
-        
-        self.diffableDatasource = UICollectionViewDiffableDataSource<SectionID, ItemID>(collectionView: self, cellProvider: { collectionView, indexPath, itemIdentifier in
-            collectionView.dequeueConfiguredReusableCell(
-                using: self.cellRegistrations.elements[indexPath.section].value,
-                for: indexPath,
-                item: itemIdentifier
-            )
-        })
-    }
-    
-    public init(collectionViewLayoutBuilder: (() -> UICollectionViewLayout), cellRegistrationHandlers: [UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler]) where CellID == Int {
-        
-        super.init(frame: .zero, collectionViewLayout: collectionViewLayoutBuilder())
-        
-        for (idx, cellRegistrationHandler) in cellRegistrationHandlers.enumerated() {
-            self.cellRegistrations[idx] = UICollectionView.CellRegistration(handler: cellRegistrationHandler)
-        }
-        
-        self.diffableDatasource = UICollectionViewDiffableDataSource<SectionID, ItemID>(collectionView: self, cellProvider: { collectionView, indexPath, itemIdentifier in
-            collectionView.dequeueConfiguredReusableCell(
-                using: self.cellRegistrations.elements[indexPath.section].value,
-                for: indexPath,
-                item: itemIdentifier
-            )
-        })
+        self.init(collectionViewLayoutHandler: collectionViewLayoutHandler, cellRegistrationHandlers: OrderedDictionary<CellID, UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler>(
+            uniqueKeysWithValues: cellRegistrationHandlers.enumerated().compactMap { offset, element in
+                (offset, element)
+            }
+        ))
     }
     
     public convenience init(
-        collectionViewLayoutBuilder: (() -> UICollectionViewLayout),
+        collectionViewLayoutHandler: (() -> UICollectionViewLayout),
         _ cellRegistrationHandler: @escaping UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler) where CellID == Int {
-            self.init(collectionViewLayoutBuilder: collectionViewLayoutBuilder, cellRegistrationHandlers: [cellRegistrationHandler])
+            self.init(collectionViewLayoutHandler: collectionViewLayoutHandler, cellRegistrationHandlers: [cellRegistrationHandler])
         }
     
     public convenience init(
-        collectionViewLayoutBuilder: (() -> UICollectionViewLayout),
+        collectionViewLayoutHandler: (() -> UICollectionViewLayout),
         cellRegistrationHandler: @escaping UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler) where CellID == Int {
-            self.init(collectionViewLayoutBuilder: collectionViewLayoutBuilder, cellRegistrationHandlers: [cellRegistrationHandler])
+            self.init(collectionViewLayoutHandler: collectionViewLayoutHandler, cellRegistrationHandlers: [cellRegistrationHandler])
         }
-    
+}
+
+public extension ModernCollectionView {
     @discardableResult
-    public func set(cellRegistrationHandlers: OrderedDictionary<CellID, UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler>) -> Self {
+    func set(cellRegistrationHandlers: OrderedDictionary<CellID, UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler>) -> Self {
         for (key, cellRegistrationHandler) in cellRegistrationHandlers {
             self.cellRegistrations[key] = UICollectionView.CellRegistration(handler: cellRegistrationHandler)
         }
@@ -90,7 +92,7 @@ CellID: Hashable, CellID: Sendable {
     }
     
     @discardableResult
-    public func set(cellRegistrationHandlers: [UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler]) -> Self where CellID == Int {
+    func set(cellRegistrationHandlers: [UICollectionView.CellRegistration<UICollectionViewCell, ItemID>.Handler]) -> Self where CellID == Int {
         for (idx, cellRegistrationHandler) in cellRegistrationHandlers.enumerated() {
             self.cellRegistrations[idx] = UICollectionView.CellRegistration(handler: cellRegistrationHandler)
         }
@@ -98,43 +100,90 @@ CellID: Hashable, CellID: Sendable {
     }
     
     @discardableResult
-    public func apply(datasource: [SectionID: [ItemID]], animatingDifferences: Bool) -> Self {
+    func set(headerViewHandlers: [Int: () -> UIContentConfiguration]) -> Self {
+        self.headerViews = Dictionary(uniqueKeysWithValues: headerViewHandlers.compactMap({ sectionIndex, _ in
+            let value = UICollectionView.SupplementaryRegistration<UICollectionViewCell>(elementKind: UICollectionView.elementKindSectionHeader) {[weak self] (supplementaryView, elementKind, indexPath) in
+                guard let headerViewHandler = headerViewHandlers[indexPath.section] else { fatalError() }
+                supplementaryView.contentConfiguration = headerViewHandler()
+            }
+            return (sectionIndex, value)
+        }))
+        return self
+    }
+    
+    @discardableResult
+    func set(headerConfigurationDic: [Int: UIContentConfiguration]) -> Self {
+        self.headerViews = Dictionary(uniqueKeysWithValues: headerConfigurationDic.compactMap({ sectionIndex, _ in
+            let value = UICollectionView.SupplementaryRegistration<UICollectionViewCell>(elementKind: UICollectionView.elementKindSectionHeader) { (supplementaryView, elementKind, indexPath) in
+                guard let headerConfiguration = headerConfigurationDic[indexPath.section] else { fatalError() }
+                supplementaryView.contentConfiguration = headerConfiguration
+            }
+            return (sectionIndex, value)
+        }))
+        return self
+    }
+
+    @discardableResult
+    func set(footerViewHandlers: [Int: () -> UIContentConfiguration]) -> Self {
+        self.footerViews = Dictionary(uniqueKeysWithValues: footerViewHandlers.compactMap({ sectionIndex, _ in
+            let value = UICollectionView.SupplementaryRegistration<UICollectionViewCell>(elementKind: UICollectionView.elementKindSectionFooter) { (supplementaryView, elementKind, indexPath) in
+                guard let footerViewHandler = footerViewHandlers[indexPath.section] else { fatalError() }
+                supplementaryView.contentConfiguration = footerViewHandler()
+            }
+            return (sectionIndex, value)
+        }))
+        return self
+    }
+    
+    @discardableResult
+    func apply(dataSource: OrderedDictionary<SectionID, [ItemID]>, animatingDifferences: Bool) -> Self {
+        
+        diffableDataSource.supplementaryViewProvider = {[weak self] collectionView, kind, indexPath in
+            guard let self else { fatalError() }
+            switch kind {
+            case UICollectionView.elementKindSectionHeader:
+                DLog(self.headerViews)
+                guard let headerView = self.headerViews[indexPath.section] else { fatalError() }
+                return collectionView.dequeueConfiguredReusableSupplementary(using: headerView, for: indexPath)
+            case UICollectionView.elementKindSectionFooter:
+                guard let footerView = self.footerViews[indexPath.section] else { fatalError() }
+                return collectionView.dequeueConfiguredReusableSupplementary(using: footerView, for: indexPath)
+            default:
+                fatalError()
+            }
+        }
+        
         var snapshot = NSDiffableDataSourceSnapshot<SectionID, ItemID>()
-        snapshot.appendSections(datasource.keys.map({ $0 }))
-        for (section, items) in datasource {
+        snapshot.appendSections(dataSource.keys.map({ $0 }))
+        for (section, items) in dataSource {
             snapshot.appendItems(items, toSection: section)
         }
-        diffableDatasource.apply(snapshot, animatingDifferences: animatingDifferences)
+        diffableDataSource.apply(snapshot, animatingDifferences: animatingDifferences)
         
         return self
     }
     
     @discardableResult
-    public func apply(datasource: [[ItemID]], animatingDifferences: Bool) -> Self where SectionID == Int {
-        var snapshot = NSDiffableDataSourceSnapshot<SectionID, ItemID>()
-        snapshot.appendSections(Array((0..<datasource.count)))
-        for (section, items) in datasource.enumerated() {
-            snapshot.appendItems(items, toSection: section)
-        }
-        diffableDatasource.apply(snapshot, animatingDifferences: animatingDifferences)
-        
-        return self
+    func apply(dataSource: [[ItemID]], animatingDifferences: Bool) -> Self where SectionID == Int {
+        apply(dataSource: OrderedDictionary(uniqueKeysWithValues: dataSource.enumerated().compactMap({ index, element in
+            (index, element)
+        })), animatingDifferences: animatingDifferences)
     }
     
     @discardableResult
-    public func reload(items: [ItemID], animatingDifferences: Bool) -> Self {
-        var snapshot = diffableDatasource.snapshot()
+    func reload(items: [ItemID], animatingDifferences: Bool) -> Self {
+        var snapshot = diffableDataSource.snapshot()
         snapshot.reloadItems(items)
-        diffableDatasource.apply(snapshot, animatingDifferences: animatingDifferences)
+        diffableDataSource.apply(snapshot, animatingDifferences: animatingDifferences)
         
         return self
     }
     
     @discardableResult
-    public func reload(sections: [SectionID], animatingDifferences: Bool) -> Self {
-        var snapshot = diffableDatasource.snapshot()
+    func reload(sections: [SectionID], animatingDifferences: Bool) -> Self {
+        var snapshot = diffableDataSource.snapshot()
         snapshot.reloadSections(sections)
-        diffableDatasource.apply(snapshot, animatingDifferences: animatingDifferences)
+        diffableDataSource.apply(snapshot, animatingDifferences: animatingDifferences)
         return self
     }
 }
